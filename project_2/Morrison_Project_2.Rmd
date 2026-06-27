@@ -1,0 +1,140 @@
+---
+title: "Project 2"
+author: "Logan Morrison - lmorrison0938@floridapoly.edu"
+date: "6/26/2026"
+---
+
+```{r setup, include=FALSE}
+# Set global options for the notebook
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = 'center')
+```
+
+```{r}
+library(tidyverse) # For data wrangling and ggplot2
+library(plotly)    # For interactive plots
+library(broom)     # For model tidying
+library(sf)        # For spatial data
+library(ggthemes)  # For themes
+library(scales)    # For axis formatting
+library(janitor)   # For Data Cleaning
+```
+
+
+```{r}
+Roxbury_link <- "https://github.com/aalhamadani/datasets/raw/refs/heads/main/WestRoxbury.csv"
+roxbury_raw <- read_csv(Roxbury_link)
+
+# Clean column names (replace spaces/special characters with underscores)
+roxbury_clean <- roxbury_raw %>%
+  janitor::clean_names() %>%
+  
+  # Filter out any homes with missing total values or 0 living area
+  filter(!is.na(total_value), living_area > 0) %>%
+  
+  # Creating simpler categorical variable for Remodel status
+  mutate(remodel_status = case_when(
+    remodel == "None" ~ "No Remodel",
+    TRUE ~ "Remodeled"
+  ))
+
+head(roxbury_clean)
+```
+
+```{r}
+interactive_plot <- plot_ly(
+  data = roxbury_clean,
+  x = ~living_area,
+  y = ~total_value,
+  color = ~remodel_status,
+  colors = c("No Remodel" = "#3498db", "Remodeled" = "#e74c3c"),
+  type = "scatter",
+  mode = "markers",
+  marker = list(opacity = 0.5, size = 7), 
+  hoverinfo = "text",
+  text = ~paste("Value: $", format(total_value, big.mark = ","),
+                "<br>Area: ", format(living_area, big.mark = ","), "sqft")
+) %>%
+  layout(
+    title = "Housing Value vs. Living Area in West Roxbury",
+    xaxis = list(title = "Living Area (Square Feet)"),
+    yaxis = list(title = "Total Value (USD)", tickprefix = "$"),
+    legend = list(title = list(text = "Remodel Status"))
+  )
+
+interactive_plot
+```
+
+```{r, fig.alt="A coefficient plot displaying standardized (Beta) coefficients with 95 percent confidence intervals. The y-axis lists two housing attributes Living Area and Lot Size. The x-axis measures the Standardized Estimate (Impact in Standard Deviations). Two blue dots with horizontal whiskers represent the data points, with Living Area showing a much higher standardized estimate than Lot Size. Red text annotated on the graph states: 'Living area is the strongest predictor of value."}
+
+
+roxbury_scaled <- roxbury_clean %>%
+  mutate(across(c(total_value, living_area, lot_sqft), ~ as.numeric(scale(.))))
+
+# Fitting the linear model using standardized data
+housing_model_std <- lm(total_value ~ living_area + lot_sqft, data = roxbury_scaled)
+
+# Tidy the model output using broom and clean up the labels
+tidy_model_std <- tidy(housing_model_std, conf.int = TRUE) %>%
+  filter(term != "(Intercept)") %>% # Remove intercept to focus on predictors
+  mutate(term = case_when(
+    term == "living_area" ~ "Living Area",
+    term == "lot_sqft" ~ "Lot Size"
+  ))
+
+ggplot(tidy_model_std, aes(x = estimate, y = reorder(term, estimate))) +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2, color = "#2c3e50", linewidth = 1) +
+  geom_point(color = "#3498db", size = 4) +
+  labs(
+    title = "Impact of Housing Attributes on Total Value",
+    subtitle = "Standardized (Beta) Coefficients with 95% Confidence Intervals",
+    x = "Standardized Estimate (Impact in Standard Deviations)",
+    y = "Housing Attribute"
+  ) +
+  theme_fivethirtyeight() +
+  theme(
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(margin = margin(r = 10)),
+    plot.title = element_text(size = 15, face = "bold"),
+    plot.subtitle = element_text(size = 12, color = "gray40"),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white")
+  ) +
+  # Adding an annotation
+  annotate("text", x = max(tidy_model_std$estimate) * 0.9, y = 1.5, 
+           label = "Living area is the strongest\npredictor of value", 
+           color = "#c0392b", fontface = "italic")
+```
+
+```{r, fig.alt="A proportional symbol map of Florida, titled image_469e36.png, illustrating the locations and surface areas of lakes across the state. The map uses orange circles of varying sizes, where each bubble's diameter represents the calculated surface area of a lake at its geographic center. While countless smaller circles are scattered throughout the state's geography, one significantly larger circle dominates the south-central region, indicating the presence of a much larger body of water."}
+
+shape_path <- "../data/Florida_Lakes.shp"
+
+florida_lakes_sf <- st_read(shape_path, quiet = TRUE) %>%
+  mutate(lake_area_km2 = as.numeric(st_area(geometry)) / 1e6)
+
+lake_centroids <- suppressWarnings(st_centroid(florida_lakes_sf))
+
+ggplot() +
+  geom_sf(data = florida_lakes_sf, fill = "gray90", color = "gray80", linewidth = 0.2) +
+  geom_sf(data = lake_centroids, aes(size = lake_area_km2), 
+          shape = 21, fill = "#d35400", color = "white", alpha = 0.6) +
+  scale_size_continuous(
+    name = "Lake Area\n(sq km)",
+    range = c(1, 18), # Ensures the smallest and largest bubbles look proportional
+    breaks = c(10, 100, 500, 1000),
+    labels = label_comma()
+  ) +
+  labs(
+    title = "Proportional Symbol Map of Florida Lakes",
+    subtitle = "Bubble size represents the calculated surface area at the lake's geographic center",
+    caption = "Data: Florida_Lakes.zip"
+  ) +
+  theme_void() + 
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5, margin = margin(t = 10, b = 5)),
+    plot.subtitle = element_text(size = 12, color = "gray40", hjust = 0.5, margin = margin(b = 15)),
+    legend.position = "right",
+    plot.background = element_rect(fill = "#fdfdfd", color = NA)
+  )
+```
+
