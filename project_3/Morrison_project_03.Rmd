@@ -1,0 +1,211 @@
+---
+title: "Data Visualization for Exploratory Data Analysis"
+output: 
+  html_document:
+    keep_md: true
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+# Set global options for the notebook
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = 'center')
+```
+
+# Data Visualization Project 03
+
+
+In this exercise you will explore methods to create different types of data visualizations (such as plotting text data, or exploring the distributions of continuous variables).
+
+
+## PART 1: Density Plots
+
+Using the dataset obtained from FSU's [Florida Climate Center](https://climatecenter.fsu.edu/climate-data-access-tools/downloadable-data), for a station at Tampa International Airport (TPA) for 2022, attempt to recreate the charts shown below which were generated using data from 2016. You can read the 2022 dataset using the code below: 
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(plotly)
+library(ggridges)
+library(viridis)
+library(tidytext)
+library(ggwordcloud)
+weather_tpa <- read_csv("https://raw.githubusercontent.com/aalhamadani/datasets/master/tpa_weather_2022.csv")
+# random sample 
+sample_n(weather_tpa, 4)
+```
+
+```{r}
+weather_tpa$month <- lubridate::month(weather_tpa$month, label = TRUE, abbr = FALSE)
+
+sample_n(weather_tpa, 4)
+```
+
+
+See Slides from Week 4 of Visualizing Relationships and Models (slide 10) for a reminder on how to use this type of dataset with the `lubridate` package for dates and times (example included in the slides uses data from 2016).
+
+Using the 2022 data: 
+
+(a) Create a plot like the one below:
+
+```{r, echo = FALSE, out.width="80%", fig.align='center'}
+knitr::include_graphics("https://raw.githubusercontent.com/aalhamadani/dataviz_final_project/main/figures/tpa_max_temps_facet.png")
+```
+
+```{r, fig.alt="A multi-panel figure featuring 12 individual histograms, one for each month of the year, illustrating the frequency of daily maximum temperatures. Each panel displays the 'Number of Days' on the y-axis and 'Maximum temperatures' on the x-axis, ranging from 50 to 100. The histograms are color-coded, transitioning from dark purple for early months to green and yellow for later months, highlighting how the distribution of daily maximum temperatures shifts throughout the year."}
+
+ggplot(weather_tpa, aes(x = max_temp, fill = month)) +
+  geom_histogram(binwidth = 3, color = "white") +
+  facet_wrap(~month) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Maximum temperatures", 
+       y = "Number of Days")
+```
+
+
+Hint: the option `binwidth = 3` was used with the `geom_histogram()` function.
+
+(b) Create a plot like the one below:
+
+```{r, echo = FALSE, out.width="80%", fig.align='center'}
+knitr::include_graphics("https://raw.githubusercontent.com/aalhamadani/dataviz_final_project/main/figures/tpa_max_temps_density.png")
+```
+
+```{r, fig.alt="A density plot showing the distribution of maximum temperatures. The x-axis represents 'Maximum Temperature,' ranging from approximately 45 to just under 100, while the y-axis represents 'Density.' The plot is filled with a solid grey color and displays a multimodal distribution, featuring several peaks with the highest density concentrated between 80 and 98 degrees."}
+
+weather_tpa %>%
+  filter(max_temp <= 99.9) %>%
+  ggplot(aes(x = max_temp)) +
+    geom_density(bw = 0.5, kernel = "biweight", fill = "grey50", alpha = 1, linewidth = 1, lineend = "round") +
+    theme_minimal() +
+    labs(x = "Maximum Temperature", 
+         y = "Density")
+```
+
+
+Hint: check the `kernel` parameter of the `geom_density()` function, and use `bw = 0.5`.
+
+(c) Create a plot like the one below:
+
+```{r, echo = FALSE, out.width="80%", fig.align='center'}
+knitr::include_graphics("https://raw.githubusercontent.com/aalhamadani/dataviz_final_project/main/figures/tpa_max_temps_density_facet.png")
+```
+
+```{r, fig.alt="A multi-panel figure containing 12 individual density plots, one for each month of the year, showing the distribution of daily maximum temperatures. Each panel features an x-axis labeled 'Maximum temperatures' ranging from 50 to 100 and a y-axis labeled 'density' ranging from 0.0 to 0.3. The density curves shift across the x-axis for different months, illustrating the seasonal variation in temperatures, with the color of the plot area transitioning from shades of purple in the early months to green and yellow in the later months"}
+
+ggplot(weather_tpa, aes(x = max_temp, fill = month,  alpha = 0.8)) +
+  geom_density(linewidth = 1) +
+  facet_wrap(~month) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Maximum temperatures", 
+       y = "density")
+```
+
+
+Hint: default options for `geom_density()` were used. 
+
+(d) Generate a plot like the chart below:
+
+
+```{r, echo = FALSE, out.width="80%", fig.align='center'}
+knitr::include_graphics("https://raw.githubusercontent.com/aalhamadani/dataviz_final_project/main/figures/tpa_max_temps_ridges_plasma.png")
+```
+
+```{r, fig.alt="A ridgeline plot, illustrating the distribution of daily maximum temperatures for every month of the year. The x-axis represents the temperature in degrees Fahrenheit, ranging from 40 to over 100, while the y-axis lists the months from January through December. Each month is represented by a density distribution curve filled with a gradient color scale: purple for lower temperatures, transitioning to orange and yellow for higher temperatures. Vertical black lines within each curve denote a median temperature value for that specific month"}
+
+ggplot(weather_tpa, aes(x = max_temp, y = fct_rev(month), fill = stat(x))) +
+  geom_density_ridges_gradient(quantile_lines = TRUE, quantiles = 2, scale = 3, linewidth = 1) +
+  scale_fill_viridis_c(name = " ", option = "plasma") +
+  theme_minimal(base_size = 18) +
+  labs(x = "Maximum Temperature (in Fahrenheit Degrees)", y = " ")
+```
+
+
+Hint: use the`{ggridges}` package, and the `geom_density_ridges()` function paying close attention to the `quantile_lines` and `quantiles` parameters. The plot above uses the `plasma` option (color scale) for the _viridis_ palette.
+
+
+(e) Create a plot of your choice that uses the attribute for precipitation _(values of -99.9 for temperature or -99.99 for precipitation represent missing data)_.
+
+```{r, fig.alt="A ridgeline plot titled 'Maximum Temperatures by Month' depicting the distribution of daily maximum temperatures at Tampa International Airport across the year. The vertical axis lists the months from January to December, and the horizontal axis represents maximum temperature values. Each month is visualized as a stacked, smooth density curve; the curves show lower, more spread-out temperature distributions during winter months and shift to higher, more concentrated temperature peaks during the summer months, clearly illustrating the seasonal warming trend in Tampa."}
+
+weather_tpa %>%
+  filter(precipitation != -99.99) %>%
+  plot_ly(
+    x = ~as.factor(month),
+    y = ~precipitation,
+    color = ~as.factor(month),
+    type = "box",
+    boxpoints = "outliers",
+    marker = list(color = "red")
+  ) %>%
+  layout(
+    title = "Precipitation Distribution at TPA by Month (2022)",
+    xaxis = list(title = "Month"),
+    yaxis = list(title = "Precipitation (inches)"),
+    showlegend = FALSE
+  )
+```
+
+
+
+## PART 2 
+
+> **You can choose to work on either Option (A) or Option (B)**. Remove from this template the option you decided not to work on. 
+
+
+### Option (A): Visualizing Text Data
+
+Review the set of slides (and additional resources linked in it) for visualizing text data: Week 6 PowerPoint slides of Visualizing Text Data. 
+
+Choose any dataset with text data, and create at least one visualization with it. For example, you can create a frequency count of most used bigrams, a sentiment analysis of the text data, a network visualization of terms commonly used together, and/or a visualization of a topic modeling approach to the problem of identifying words/documents associated to different topics in the text data you decide to use. 
+
+Make sure to include a copy of the dataset in the `data/` folder, and reference your sources if different from the ones listed below:
+
+- [Billboard Top 100 Lyrics](https://raw.githubusercontent.com/aalhamadani/dataviz_final_project/main/data/BB_top100_2015.csv)
+
+- [RateMyProfessors comments](https://raw.githubusercontent.com/aalhamadani/dataviz_final_project/main/data/rmp_wit_comments.csv)
+
+- [FL Poly News Articles](https://raw.githubusercontent.com/aalhamadani/dataviz_final_project/main/data/flpoly_news_SP23.csv)
+
+
+(to get the "raw" data from any of the links listed above, simply click on the `raw` button of the GitHub page and copy the URL to be able to read it in your computer using the `read_csv()` function)
+
+```{r}
+billboard_data <- "../data/BB_top100_2015.csv"
+billboard <- read.csv(billboard_data)
+head(billboard)
+
+```
+
+This is also the Redesign of a bad chart: 
+
+```{r, fig.alt=" A word cloud titled 'Most Frequent Words in Billboard Top 100 Track Titles,'. The visualization displays various words from song titles in varying sizes and shades of blue. The words 'love,', 'im' and 'dont' appear in the largest font and lightest blue, indicating they are the most frequently occurring words in the dataset, while numerous other words like 'girl,' 'aint,' 'yeah,' and 'time' appear in smaller sizes around them."}
+
+# Before
+billboard_words <- billboard %>%
+  unnest_tokens(word, Lyrics) %>%
+  anti_join(stop_words, by = "word") %>%
+  count(word, sort = TRUE) %>%
+  slice_max(n, n = 100) 
+
+ggplot(billboard_words, aes(label = word, size = n, color = n)) +
+  geom_text_wordcloud_area() +
+  scale_size_area(max_size = 30) +
+  theme_minimal() +
+  labs(title = "Most Frequent Words in Billboard Top 100 Track Titles")
+```
+
+```{r, fig.alt=" A word cloud titled 'Most Frequent Words in Billboard Top 100 Track Titles,'. The visualization displays various words from song titles in varying sizes and shades of blue. The words 'love,', 'im' and 'dont' appear in the largest font and darkest blue, indicating they are the most frequently occurring words in the dataset, while numerous other words like 'girl,' 'aint,' 'yeah,' and 'time' appear in smaller sizes around them."}
+
+# After
+ggplot(billboard_words, aes(label = word, size = n, color = n)) +
+  geom_text_wordcloud_area(shape = "circle", seed = 42) +
+  scale_size_area(max_size = 30) +
+  scale_color_gradient(low = "#69b3a2", high = "#404080") +
+  theme_void() +
+  labs(title = "Most Frequent Words in Billboard Top 100 Track Titles") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16))
+```
+
