@@ -1,0 +1,130 @@
+---
+title: "R Notebook"
+author: "Logan Morrison"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+# Set global options for the notebook
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = 'center')
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(sf)
+```
+
+```{r}
+rats <- read.csv("../data/rats_nyc.csv")
+```
+
+```{r}
+brooklyn <- read_sf("../data/brooklyn.geojson")
+manhattan <- read_sf("../data/manhattan.geojson")
+```
+
+```{r}
+head(rats)
+```
+
+```{r}
+summary(rats)
+```
+```{r, fig.alt="A point map titled: Spatial Map of NYC Rat Sightings, which displays the locations of reported rat sightings across the five boroughs of New York City using latitude and longitude coordinates. The data points are color-coded by borough to distinguish between the regions: red for the Bronx, blue for Brooklyn, green for Manhattan, purple for Queens, and orange for Staten Island."}
+
+rats_filtered <- rats %>% 
+  filter(!is.na(latitude) & !is.na(longitude) & !is.na(borough))
+
+ggplot(rats_filtered, aes(x = longitude, y = latitude, color = borough)) +
+  geom_point(alpha = 0.05, size = 0.5) +                                     
+  scale_color_brewer(palette = "Set1") +
+  theme_void() +                                                             
+  labs(
+    title = "Spatial Map of NYC Rat Sightings",
+    subtitle = "Point map based on Latitude/Longitude coordinates",
+    color = "Borough"
+  ) +
+  
+  # Overriding the legend transparency so the dots are actually visible on the legend
+  guides(color = guide_legend(override.aes = list(alpha = 1, size = 4))) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "right"
+  )
+
+```
+
+
+```{r, fig.alt="A bar chart titled: NYC Rat Sightings by Borough, which displays the frequency of reported rat sightings across the five New York City boroughs. The y-axis represents the 'Number of Sightings' (ranging from 0 to 15,000), and the x-axis lists the boroughs. The bars are arranged in descending order of frequency, showing that Brooklyn has the highest number of sightings, followed by Manhattan, the Bronx, Queens, and finally Staten Island, which has the fewest."}
+
+
+# Filter out rows where Borough might be missing
+rats_b <- rats %>% filter(!is.na(borough))
+
+ggplot(rats_b, aes(x = reorder(borough, borough, function(x)-length(x)), fill = borough)) +
+  geom_bar() +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal() +
+  labs(
+    title = "NYC Rat Sightings by Borough",
+    x = "Borough",
+    y = "Number of Sightings"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(size = 12)
+  )
+```
+
+```{r, fig.alt="A map titled: Spatial Map of Brooklyn Rat Sightings, illustrating the geographic distribution of reported rat sightings across the borough of Brooklyn. The map features a light grey outline of the borough overlaid with numerous blue dots. The density of these dots varies, with darker, more concentrated clusters highlighting areas with a higher frequency of sightings, while sparser regions indicate areas with fewer reports."}
+
+rats_brooklyn <- rats %>% 
+  filter(borough == "BROOKLYN")
+
+ggplot() +
+  geom_sf(data = brooklyn) +
+  
+    geom_point(data = rats_brooklyn, color="blue",
+             aes(x = longitude, y = latitude), 
+             alpha = 0.05, size = 0.5) +                                      
+    theme_void() +                                                             
+  labs(
+    title = "Spatial Map of Brooklyn Rat Sightings"
+  ) +
+  
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "none"
+  )
+```
+```{r, fig.alt="A map titled: Spatial Map of Manhattan Rat Sightings, illustrating the geographic distribution of reported rat sightings across the borough of Manhattan. The map features a light grey outline of the borough overlaid with numerous green dots. The density of these dots varies, with darker, more concentrated clusters highlighting areas with a higher frequency of sightings, while sparser regions indicate areas with fewer reports."}
+
+rats_manhattan <- rats %>% 
+  filter(borough == "MANHATTAN")
+
+ggplot() +
+  geom_sf(data = manhattan) +
+  
+    geom_point(data = rats_manhattan, color="green", 
+             aes(x = longitude, y = latitude), 
+             alpha = 0.05, size = 0.5) +                                      
+    theme_void() +                                                             
+  labs(
+    title = "Spatial Map of Manhattan Rat Sightings"
+  ) +
+  
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "none"
+  )
+```
+
